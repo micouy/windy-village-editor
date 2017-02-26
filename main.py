@@ -7,59 +7,115 @@ import random
 import math
 import os
 
+clear = lambda: os.system('cls')
+
 def mapToRange(value, in_min, in_max, out_min, out_max):
     return ((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
+class Rectangle(object):
+    def __init__(self, x = 0, y = 0, width = 0, height = 0):
+        self.x = x
+        self.y = y
+        self.width = abs(width)
+        self.height = abs(height)
+
+class Point2D(object):
+    def __init__(self, x = 0, y = 0):
+        self.x = x
+        self.y = y
+
 class Control(object):
     def __init__(self, width, height):
-        self.mode = 'edit' # edit / preview
-        self.frames = FrameManager(self, width, height)
+        self.mode = 'preview'
+        self.frames = FramesManager(self, width, height)
+
         self.game = Game(self, width, height)
         self.sprites = self.game.sprites
 
+    def changeMode(self, mode):
+        self.mode = mode
+        self.game.changeMode(mode)
+
     def update(self):
         self.frames.update()
-        self.game.update()
+        if self.mode == 'preview':
+            self.game.preview()
+        elif self.mode == 'play':
+            self.game.update()
 
     def addBlock(self, x, y, width, height):
-        s = Sprite(self.game, x, y, width, height)
+        self.game.addBlock(x, y, width, height)
 
-class FrameManager(object):
+class FramesManager(object):
     def __init__(self, control, width, height):
         self.control = control
-        self.width = width + 200
-        self.height = height + 50
         self.root = tk.Tk()
-        self.mainFrame = Frame(self.root, width = width, height = height)
-        self.mainFrame.grid(columnspan = width, rowspan = 500)
-        self.mainFrame.pack(side = LEFT)
-        os.environ['SDL_WINDOWID'] = str(self.mainFrame.winfo_id())
-        os.environ['SDL_VIDEODRIVER'] = 'windib'
 
-        self.addBlockDoc = AddBlockDoc(self)
+        self.root.minsize(width = 1150, height = 700)
+        self.frame = Frame(self.root)
+        self.frame.grid_columnconfigure(0, weight = 1)
+        self.frame.grid_columnconfigure(1, weight = 1)
+        self.frame.pack()
+        self.rightDoc = RightDoc(self)
+        self.gameFrame = GameFrame(self, width, height)
 
     def update(self):
         self.root.update()
 
-class AddBlockDoc(object):
-    def __init__(self, parent):
-        self.root = parent.root
-        self.control = parent.control
+class WidgetManager(object):
+    def __init__(self, parent, row, column):
         self.parent = parent
-        self.frame = Frame(self.root, width = 75, height = self.parent.height)
-        self.frame.pack(side = LEFT)
+        self.control = parent.control
+        self.root = parent.root
+        self.frame = Frame(self.parent.frame)
+        self.frame.grid(row = row, column = column)
+
+class RightDoc(WidgetManager):
+    def __init__(self, parent):
+        self.parent = parent
+        self.control = parent.control
+        self.root = parent.root
+        self.frame = Frame(self.parent.frame)
+        self.frame.grid(row = 0, column = 1, ipadx = 10, ipady = 10, sticky = N)
+        self.controlMenu = ControlMenu(self)
+        self.addBlockDoc = AddBlockMenu(self)
+
+class GameFrame(WidgetManager):
+    def __init__(self, parent, width, height):
+        self.control = parent.control
+        self.root = parent.root
+        self.parent = parent
+        self.frame = Frame(self.parent.frame, width = width, height = height)
+        self.frame.grid(column = 0, row = 0)
+        os.environ['SDL_WINDOWID'] = str(self.frame.winfo_id())
+        os.environ['SDL_VIDEODRIVER'] = 'windib'
+
+class ControlMenu(WidgetManager):
+    def __init__(self, parent):
+        super(ControlMenu, self).__init__(parent, 0, 0)
+        self.frame.grid_columnconfigure(0, weight = 1)
+        self.frame.grid_columnconfigure(1, weight = 1)
+        self.previewMode_button = Button(self.frame, text = 'Preview', command = lambda: self.control.changeMode('preview'))
+        self.previewMode_button.grid(row = 0, column = 0, sticky = W + E)
+        self.playMode_button = Button(self.frame, text = 'Play', command = lambda: self.control.changeMode('play'))
+        self.playMode_button.grid(row = 0, column = 1, sticky = W + E)
+
+class AddBlockMenu(WidgetManager):
+    def __init__(self, parent):
+        super(AddBlockMenu, self).__init__(parent, 1, 0)
         self.x_entry = LabelEntry(self.frame, 'x: ', 0, 0)
         self.y_entry = LabelEntry(self.frame, 'y: ', 1, 0)
-        # self.z_entry = LabelEntry(self.frame, 'z: ', 2, 0)
         self.width_entry = LabelEntry(self.frame, 'width: ', 3, 0)
-        self.height_entry = LabelEntry(self.frame, 'height: ', 4, 0)
+        self.height_entry = LabelEntry(self.frame, 'height: ', 4 * 3, 0)
+
+        # self.z_entry = LabelEntry(self.frame, 'z: ', 2, 0)
         # self.depth_entry = LabelEntry(self.frame, 'depth: ', 5, 0)
 
         self.addBlock_button = Button(self.frame, text = 'Add block', command = lambda: self.addBlock())
-        self.addBlock_button.grid(row = 5)
+        self.addBlock_button.grid(row = 5, columnspan = 2, pady = 2)
 
         self.response_label = Label(self.frame, text = '')
-        self.response_label.grid(row = 6, columnspan = 2, sticky = W)
+        self.response_label.grid(row = 6, columnspan = 2, sticky = W, pady = 2)
 
     def addBlock(self):
         x = self.x_entry.get()
@@ -77,13 +133,12 @@ class AddBlockDoc(object):
         else:
             self.response_label.config(text = 'Enter correct values')
 
-
 class LabelEntry(object):
     def __init__(self, parent, text, row, column, width = 10):
         self.label = Label(parent, text = text)
-        self.label.grid(row = row, column = column, sticky = W)
+        self.label.grid(row = row, column = column, sticky = W, pady = 2)
         self.entry = Entry(parent, width = width)
-        self.entry.grid(row = row, column = column + 1)
+        self.entry.grid(row = row, column = column + 1, pady = 2)
 
     def get(self):
         return self.entry.get()
@@ -95,22 +150,48 @@ class Game(object):
     def __init__(self, control, width, height):
         self.width = width
         self.height = height
-        self.screen = pygame.display.set_mode((width,height))
-        self.screen.fill(pygame.Color(255,255,255))
+        self.screen = pygame.display.set_mode((1000, 600))
+        self.screen.fill(pygame.Color(255,255, 255))
         self.clock = pygame.time.Clock()
         pygame.display.init()
-        self.sprites = []
-        self.mouse = {'ispressed': False, 'pressed': (), 'current': ()}
+        self.sprites = [
+            Sprite(self, 0, 0, 100, 100),
+            Sprite(self, 300, 100, 100, 100),
+            Sprite(self, 200, 0, 100, 100),
+            Sprite(self, 100, 300, 100, 100)
+        ]
+        self.mouse = Mouse(self)
+        self.mode = 'preview'
+
+    def changeMode(self, mode):
+        if mode == 'preview':
+            self.mouse.initialise()
+            self.mode = mode
+            for sprite in self.sprites:
+                sprite.initialise()
+        elif mode == 'play':
+            self.mode = mode
+            for sprite in self.sprites:
+                sprite.selected = False
+                sprite.save()
+
+    def preview(self):
+        self.mouse.update()
+
+        for sprite in self.sprites:
+            sprite.preview()
+
+        self.screen.fill((255, 255, 255))
+
+        for sprite in self.sprites:
+            sprite.draw()
+
+        self.mouse.draw()
+
+        pygame.display.update()
+        self.clock.tick(60)
 
     def update(self):
-        self.mouse['current'] = pygame.mouse.get_pos()
-
-        for event in pygame.event.get():
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                self.mouse['pressed'] = pygame.mouse.get_pos()
-            elif event.type == pygame.MOUSEBUTTONUP:
-                self.mouse['pressed'] = None
-
         for sprite in self.sprites:
             sprite.update()
 
@@ -119,28 +200,163 @@ class Game(object):
         for sprite in self.sprites:
             sprite.draw()
 
-        if self.mouse['pressed']:
-            px, py = self.mouse['pressed']
-            cx, cy = self.mouse['current']
-            pygame.draw.rect(self.screen, (0, 50, 255), (min(cx, px), min(cy, py), abs(cx - px), abs(cy - py)))
-
         pygame.display.update()
         self.clock.tick(30)
 
-class Mouse(object):
-    def __init__(self):
-        self.x, self.y = pygame.mouse.get_pos()
-        self.pressed = False
-        self.pressed_x, self.pressed_y = ()
+    def addBlock(self, x, y, width, height):
+        self.sprites.append(Sprite(self, x, y, width, height))
 
-    def upadate(self):
-        for event in pygame.event.get():
+class Mouse(object):
+    def __init__(self, game):
+        self.game = game
+        self.screen = game.screen
+        self.sprites = game.sprites
         self.x, self.y = pygame.mouse.get_pos()
-        self.pressed = False
-        self.pressed_x, self.pressed_y = ()
+        self.delta = Point2D()
+        self.pressed = Point2D(None, None)
+        self.selection = Rectangle()
+        self.selected = []
+        self.isDragging = False
+        self.hasMoved = False
+        self.isShift = False
+        self.isUp = True
+        self.isDown = False
+        self.isReleased = False
+        self.isPressed = False
+        self.info = {'isDown': False, 'isUp': True}
+
+    def initialise(self):
+        self.x, self.y = pygame.mouse.get_pos()
+        self.delta = Point2D()
+        self.pressed = Point2D(None, None)
+        self.selection = Rectangle()
+        self.selected = []
+        self.isDragging = False
+        self.hasMoved = False
+        self.isShift = False
+        self.isUp = True
+        self.isDown = False
+        self.isReleased = False
+        self.isPressed = False
+        self.info = {'isDown': False, 'isUp': True}
+
+    def update(self):
+        self.isShift = False
+        self.isPressed = False
+        self.isReleased = False
+
+        self.delta.x, self.delta.y = pygame.mouse.get_pos()
+        self.delta.x -= self.x
+        self.delta.y -= self.y
+        self.x, self.y = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.info['isDown'] = True
+                self.info['isUp'] = False
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self.info['isDown'] = False
+                self.info['isUp'] = True
+
+        if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+            self.isShift = True
+
+        if self.isUp:
+            if self.info['isDown']:
+                self.isUp = False
+                self.isDown = True
+                self.isPressed= True
+
+        if self.isDown:
+            if self.info['isUp']:
+                self.isDown = False
+                self.isUp = True
+                self.isReleased = True
+
+        if self.isReleased:
+            self.pressed.x = self.pressed.y = None
+
+        if self.isReleased:
+            self.isDragging = False
+
+        if self.isDown:
+            if self.x != self.pressed.x or self.y != self.pressed.y:
+                self.hasMoved = True
+
+        if self.isPressed:
+            self.pressed.x, self.pressed.y = self.x, self.y
+            self.hasMoved = False
+            for sprite in self.sprites:
+                if (sprite.x < self.x
+                and sprite.x + sprite.width > self.x
+                and sprite.y < self.y
+                and sprite.y + sprite.height > self.y):
+                    if not sprite in self.selected:
+                        if not self.isShift:
+                            for selected in self.selected:
+                                selected.selected = False
+                                self.selected = []
+                        self.selected.append(sprite)
+                        sprite.selected = True
+                    self.isDragging = True
+                    break
+            else:
+                if not self.isShift:
+                    for sprite in self.selected:
+                        sprite.selected = False
+                        self.selected = []
+
+        if not self.isDragging:
+            if self.pressed.x and self.pressed.y:
+                self.selection.x = min(self.x, self.pressed.x)
+                self.selection.y = min(self.y, self.pressed.y)
+                self.selection.width = abs(self.x - self.pressed.x)
+                self.selection.height = abs(self.y - self.pressed.y)
+        if self.isReleased:
+            self.selection.x = None
+            self.selection.y = None
+            self.selection.width = None
+            self.selection.height = None
+
+        if self.selection.width > 0 and self.selection.height > 0:
+            for sprite in self.sprites:
+                if (self.selection.x - sprite.width / 4 * 3 <= sprite.x
+                and self.selection.x + self.selection.width + sprite.width / 4 * 3 >= sprite.x + sprite.width
+                and self.selection.y - sprite.width / 4 * 3 <= sprite.y
+                and self.selection.y + self.selection.height + sprite.width / 4 * 3 >= sprite.y + sprite.height):
+                    if not sprite in self.selected:
+                        self.selected.append(sprite)
+                        sprite.selected = True
+                elif sprite in self.selected and not self.isShift:
+                    self.selected.remove(sprite)
+                    sprite.selected = False
+
+        if self.isDragging:
+            clear()
+            print len(self.selected)
+            for sprite in self.selected:
+                sprite.x += self.delta.x
+                sprite.y += self.delta.y
+
+    def get(self):
+        return {'up': self.up, 'down': self.down, 'released': self.released, 'pressed': self.pressed}
+
+    def draw(self):
+        if self.selection.width and self.selection.height:
+            selectionRectangle = pygame.Surface((self.selection.width, self.selection.height))
+            selectionRectangle.fill((0, 100, 155))
+            selectionRectangle.set_alpha(50)
+            self.screen.blit(selectionRectangle, (self.selection.x, self.selection.y))
+            pygame.draw.rect(self.screen, (100, 150, 255), (self.selection.x, self.selection.y, self.selection.width, self.selection.height), 1)
 
 class Sprite(object):
     def __init__(self, game, x, y, width, height):
+        self.original = {
+            'x': x,
+            'y': y,
+            'width': width,
+            'height': height
+        }
         self.game = game
         self.screen = game.screen
         self.x = x
@@ -149,7 +365,13 @@ class Sprite(object):
         self.height = height
         self.velocity_x = 9
         self.velocity_y = 5
-        self.game.sprites.append(self)
+        self.selected = False
+
+    def initialise(self):
+        self.x = self.original['x']
+        self.y = self.original['y']
+        self.width = self.original['width']
+        self.height = self.original['height']
 
     def update(self):
         if self.x + self.width + self.velocity_x > self.game.width or self.x + self.velocity_x < 0:
@@ -159,8 +381,20 @@ class Sprite(object):
         self.x += self.velocity_x
         self.y += self.velocity_y
 
+    def preview(self):
+        pass
+
+    def save(self):
+        self.original['x'] = self.x
+        self.original['y'] = self.y
+        self.original['width'] = self.width
+        self.original['height'] = self.height
+
     def draw(self):
-        pygame.draw.rect(self.screen, (0, 0, 0), (self.x, self.y, self.width, self.height))
+        if self.selected:
+            pygame.draw.rect(self.screen, (50, 100, 150), (self.x, self.y, self.width, self.height))
+        else:
+            pygame.draw.rect(self.screen, (0, 0, 0), (self.x, self.y, self.width, self.height))
 
 def main():
     control = Control(1000, 600)

@@ -7,8 +7,6 @@ import random
 import math
 import os
 
-clear = lambda: os.system('cls')
-
 def mapToRange(value, in_min, in_max, out_min, out_max):
     return ((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
@@ -332,8 +330,6 @@ class Mouse(object):
                     sprite.selected = False
 
         if self.isDragging:
-            clear()
-            print len(self.selected)
             for sprite in self.selected:
                 sprite.x += self.delta.x
                 sprite.y += self.delta.y

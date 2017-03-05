@@ -1,48 +1,13 @@
 from __future__ import division
-from __future__ import division
 import Tkinter as tk
 from Tkinter import *
+import json
 import pygame
 import random
 import math
 import os
 
-def mapToRange(value, in_min, in_max, out_min, out_max):
-    return ((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
-
-class Rectangle(object):
-    def __init__(self, x = 0, y = 0, width = 0, height = 0):
-        self.x = x
-        self.y = y
-        self.width = abs(width)
-        self.height = abs(height)
-
-class Point2D(object):
-    def __init__(self, x = 0, y = 0):
-        self.x = x
-        self.y = y
-
-class Control(object):
-    def __init__(self, width, height):
-        self.mode = 'preview'
-        self.frames = FramesManager(self, width, height)
-
-        self.game = Game(self, width, height)
-        self.sprites = self.game.sprites
-
-    def changeMode(self, mode):
-        self.mode = mode
-        self.game.changeMode(mode)
-
-    def update(self):
-        self.frames.update()
-        if self.mode == 'preview':
-            self.game.preview()
-        elif self.mode == 'play':
-            self.game.update()
-
-    def addBlock(self, x, y, width, height):
-        self.game.addBlock(x, y, width, height)
+# ***** EDITOR COMPONENTS *****
 
 class FramesManager(object):
     def __init__(self, control, width, height):
@@ -144,71 +109,58 @@ class LabelEntry(object):
     def delete(self):
         self.entry.delete(0, 'end')
 
-class Game(object):
-    def __init__(self, control, width, height):
-        self.width = width
-        self.height = height
-        self.screen = pygame.display.set_mode((1000, 600))
-        self.screen.fill(pygame.Color(255,255, 255))
-        self.clock = pygame.time.Clock()
-        pygame.display.init()
-        self.sprites = [
-            Sprite(self, 0, 0, 100, 100),
-            Sprite(self, 300, 100, 100, 100),
-            Sprite(self, 200, 0, 100, 100),
-            Sprite(self, 100, 300, 100, 100)
-        ]
-        self.mouse = Mouse(self)
+# ***** EDITOR *****
+
+class Control(object):
+    def __init__(self, width, height):
         self.mode = 'preview'
+        self.path = os.path.dirname(os.path.realpath('__file__'))
+        self.frames = FramesManager(self, width, height)
+
+        self.game = Game(self, width, height)
+        self.current = self.game.current
+        self.sprites = self.current.sprites
 
     def changeMode(self, mode):
-        if mode == 'preview':
-            self.mouse.initialise()
-            self.mode = mode
-            for sprite in self.sprites:
-                sprite.initialise()
-        elif mode == 'play':
-            self.mode = mode
-            for sprite in self.sprites:
-                sprite.selected = False
-                sprite.save()
-
-    def preview(self):
-        self.mouse.update()
-
-        for sprite in self.sprites:
-            sprite.preview()
-
-        self.screen.fill((255, 255, 255))
-
-        for sprite in self.sprites:
-            sprite.draw()
-
-        self.mouse.draw()
-
-        pygame.display.update()
-        self.clock.tick(60)
+        self.mode = mode
+        self.game.changeMode(mode)
 
     def update(self):
-        for sprite in self.sprites:
-            sprite.update()
-
-        self.screen.fill((255, 255, 255))
-
-        for sprite in self.sprites:
-            sprite.draw()
-
-        pygame.display.update()
-        self.clock.tick(30)
+        self.frames.update()
+        if self.mode == 'preview':
+            self.game.preview()
+        elif self.mode == 'play':
+            self.game.update()
 
     def addBlock(self, x, y, width, height):
-        self.sprites.append(Sprite(self, x, y, width, height))
+        self.game.addBlock(x, y, width, height)
+
+# ***** GAME *****
+
+def displayingOrder(a, b):
+    if a.y + a.height > b.y and a.z + a.depth > b.z:
+        return 1
+    else:
+        return -1
+
+def scaleImage(image, scale):
+    if isinstance(scale, int) or isinstance(scale, float):
+        rect = image.get_rect()
+        i = pygame.transform.scale(image, (int(rect.width * scale), int(rect.height * scale)))
+    else:
+        i = pygame.transfrom.scale(image, scale)
+
+    return i
+
+def mapToRange(value, in_min, in_max, out_min, out_max):
+    return ((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
 class Mouse(object):
     def __init__(self, game):
         self.game = game
+        self.current = game.current
         self.screen = game.screen
-        self.sprites = game.sprites
+        self.sprites = self.current.sprites
         self.x, self.y = pygame.mouse.get_pos()
         self.delta = Point2D()
         self.pressed = Point2D(None, None)
@@ -224,6 +176,7 @@ class Mouse(object):
         self.info = {'isDown': False, 'isUp': True}
 
     def initialise(self):
+        self.sprites = self.current.sprites()
         self.x, self.y = pygame.mouse.get_pos()
         self.delta = Point2D()
         self.pressed = Point2D(None, None)
@@ -284,18 +237,26 @@ class Mouse(object):
         if self.isPressed:
             self.pressed.x, self.pressed.y = self.x, self.y
             self.hasMoved = False
+            toSelect = []
             for sprite in self.sprites:
                 if (sprite.x < self.x
                 and sprite.x + sprite.width > self.x
-                and sprite.y < self.y
-                and sprite.y + sprite.height > self.y):
+                and sprite.z - sprite.y - sprite.height < self.y
+                and sprite.z - sprite.y + sprite.depth > self.y):
+                    # if not sprite in self.selected:
                     if not sprite in self.selected:
-                        if not self.isShift:
+                        if not self.isShift and not self.isDragging:
                             for selected in self.selected:
                                 selected.selected = False
                                 self.selected = []
-                        self.selected.append(sprite)
-                        sprite.selected = True
+                    # if not self.isShift and not self.isDragging:
+                    if not sprite in toSelect:
+                        toSelect.append(sprite)
+                if len(toSelect) > 0:
+                    toSelect.sort(displayingOrder)
+                    if not toSelect[0] in self.selected:
+                        self.selected.append(toSelect[0])
+                    toSelect[0].selected = True
                     self.isDragging = True
                     break
             else:
@@ -320,8 +281,8 @@ class Mouse(object):
             for sprite in self.sprites:
                 if (self.selection.x - sprite.width / 4 * 3 <= sprite.x
                 and self.selection.x + self.selection.width + sprite.width / 4 * 3 >= sprite.x + sprite.width
-                and self.selection.y - sprite.width / 4 * 3 <= sprite.y
-                and self.selection.y + self.selection.height + sprite.width / 4 * 3 >= sprite.y + sprite.height):
+                and self.selection.y - sprite.height / 4 * 3 <= sprite.y
+                and self.selection.y + self.selection.height + sprite.depth / 4 * 3 >= sprite.z - sprite.y + sprite.depth):
                     if not sprite in self.selected:
                         self.selected.append(sprite)
                         sprite.selected = True
@@ -329,10 +290,10 @@ class Mouse(object):
                     self.selected.remove(sprite)
                     sprite.selected = False
 
-        if self.isDragging:
+        if self.isDragging and not self.isShift:
             for sprite in self.selected:
                 sprite.x += self.delta.x
-                sprite.y += self.delta.y
+                sprite.z += self.delta.y
 
     def get(self):
         return {'up': self.up, 'down': self.down, 'released': self.released, 'pressed': self.pressed}
@@ -345,23 +306,330 @@ class Mouse(object):
             self.screen.blit(selectionRectangle, (self.selection.x, self.selection.y))
             pygame.draw.rect(self.screen, (100, 150, 255), (self.selection.x, self.selection.y, self.selection.width, self.selection.height), 1)
 
+class Rectangle(object):
+    def __init__(self, x = 0, y = 0, width = 0, height = 0):
+        self.x = x
+        self.y = y
+        self.width = abs(width)
+        self.height = abs(height)
+
+class Point2D(object):
+    def __init__(self, x = 0, y = 0):
+        self.x = x
+        self.y = y
+
+class Point(object):
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def add(self, a):
+        self.x += a.x
+        self.y += a.y
+        self.z += a.z
+
+    def mult(self, a):
+        if a.isidgit():
+            self.x *= a
+            self.y *= a
+            self.z *= a
+        else:
+            self.x *= a.x
+            self.y *= a.y
+            self.z *= a.z
+
+class Velocity(Point):
+    def __init__(self):
+        super(Velocity, self).__init__(0, 0, 0)
+
+class Renderer(object):
+    def __init__(self, control):
+        self.font = pygame.font.SysFont('monospace', 20)
+        self.control = control
+        self.screen = control.screen
+        self.toWrite = []
+        self.toDraw = []
+
+    def update(self):
+        self.toWrite = []
+        self.toDraw = []
+
+    def text(self, text, x=None, y=None):
+        self.toWrite.append({'text': text, 'x': x, 'y': y})
+
+    def point(self, x, y):
+        self.toDraw.append({'type': 'point','x': x, 'y': y})
+
+    def all(self):
+        bg = pygame.Surface((200, len(self.toWrite) * 15 + 20))
+        bg.set_alpha(100)
+        bg.fill((0, 0, 0))
+        self.screen.blit(bg, (100, 100))
+        label = self.font.render("Debug: ", 1, (0, 0, 0))
+        self.screen.blit(label, (100, 100))
+        for index, text in enumerate(self.toWrite):
+            label = self.font.render(str(text['text']), 1, (0, 0, 0))
+            if text['x'] and text['y']:
+                self.screen.blit(label, (text['x'], text['y']))
+            else:
+                self.screen.blit(label, (100, 120 + index * 15))
+
+        for shape in self.toDraw:
+            if shape['type'] == 'point':
+                if hasattr(self, 'camera'):
+                    pygame.draw.ellipse(self.screen, (0, 0, 0), (shape['x'] - self.camera.x, shape['y'] - self.camera.y, 4, 4))
+                else:
+                    pygame.draw.ellipse(self.screen, (0, 0, 0), (shape['x'], shape['y'], 4, 4))
+
+class Level(object):
+    def __init__(self, game, index = 0):
+        self.game = game
+        self.render = game.render
+        self.screen = game.screen
+        self.index = index
+        self.frame = 0
+        self.camera = self.game.camera
+        self.render.camera = self.camera
+        self.sprites = []
+        self.statics = []
+        self.dynamics = []
+        self.entrances = []
+
+    def initialise(self, entranceIndex):
+        levels_path = self.game.path + '/levels'
+        level_path = levels_path + '/level_' + str(self.index) + '.json'
+        level_json = open(level_path, 'r')
+        self.data = json.load(level_json)
+        level_json.close()
+
+        animations_path = self.game.path + '/assets/animations.json'
+        animations_json = open(animations_path, 'r')
+        self.animations = json.load(animations_json)
+        animations_json.close()
+
+        for static in self.data['statics']:
+            x = static['x']
+            y = static['y']
+            z = static['z']
+            width = static['width']
+            height = static['height']
+            depth = static['depth']
+            if 'image' in static:
+                image = str(static['image'])
+                folder = None
+            elif 'folder' in static:
+                image = None
+                folder = str(static['folder'])
+            else:
+                image = None
+                folder = None
+            s = Static(self.game, x, y, z, width, height, depth, folder, image)
+            self.statics.append(s)
+
+        for dynamic in self.data['dynamics']:
+            x = dynamic['x']
+            y = dynamic['y']
+            z = dynamic['z']
+            width = dynamic['width']
+            height = dynamic['height']
+            depth = dynamic['depth']
+            if 'image' in static:
+                image = str(static['image'])
+                folder = None
+            elif 'folder' in static:
+                image = None
+                folder = str(static['folder'])
+            else:
+                image = None
+                folder = None
+            d = Dynamic(self.game, x, y, z, width, height, depth, folder, image)
+            self.dynamics.append(d)
+
+        player = {}
+
+        for entrance in self.data['entrances']:
+            index = entrance['index']
+            connection = entrance['connection']
+            direction = entrance['direction']
+            x = entrance['x']
+            y = entrance['y']
+            z = entrance['z']
+
+            if 'width' in entrance:
+                width = entrance['width']
+            else:
+                if direction == 1 or direction == 3:
+                    width = 50
+                else:
+                    width = 20
+            if 'height' in entrance:
+                height = entrance['height']
+            else:
+                height = 150
+            if 'depth' in entrance:
+                depth = entrance['depth']
+            else:
+                if direction == 1 or direction == 3:
+                    depth = 20
+                else:
+                    depth = 50
+
+            if index == entranceIndex:
+                player['y'] = y
+
+                if direction == 1:
+                    player['x'] = x
+                    player['z'] = z - 60
+                elif direction == 2:
+                    player['x'] = x + width + 10
+                    player['z'] = z
+                elif direction == 3:
+                    player['x'] = x
+                    player['z'] = z + depth + 10
+                elif direction == 4:
+                    player['x'] = x - 60
+                    player['z'] = z
+
+            e = Entrance(self.game, index, connection, direction, x, y, z, width, height, depth)
+            self.entrances.append(e)
+
+        self.player = Player(self.game, player['x'], player['y'], player['z'])
+        self.dynamics.append(self.player)
+        self.camera.follow(self.player.focusSpot)
+
+    def save(self):
+        for sprite in self.sprites:
+            sprite.selected = False
+            sprite.save()
+
+    def preview(self):
+        pass
+
+    def update(self):
+        self.player.getKeys()
+        self.player.updateFocusSpot()
+        self.camera.update()
+        for dynamic in self.dynamics:
+            dynamic.velocity.y -= self.game.gravity / self.game.FPS
+
+        self.sprites.sort(key = lambda sprite: sprite.y)
+
+        for dynamic in self.dynamics:
+            dynamic.collide()
+        for sprite in self.statics + self.dynamics + self.entrances:
+            sprite.update()
+
+        if self.player.y < 0:
+            self.initialise(1)
+
+    def draw(self):
+        self.sprites.sort(displayingOrder)
+        for sprite in self.sprites:
+            sprite.draw()
+
+class EmptyLevel(object):
+    def __init__(self, game):
+        self.game = game
+        self.render = game.render
+        self.screen = game.screen
+        self.frame = 0
+        self.camera = Camera(self.game)
+        self.render.camera = self.camera
+        self.sprites = []
+        self.statics = []
+        self.dynamics = []
+        self.entrances = []
+
+    def reset(self):
+        for sprite in self.sprites:
+            sprite.initialise()
+
+    def preview(self):
+        pass
+
+    def update(self):
+        self.player.getKeys()
+        self.player.updateFocusSpot()
+        self.camera.update()
+        for dynamic in self.dynamics:
+            dynamic.velocity.y -= self.game.gravity / self.game.FPS
+
+        self.sprites.sort(key = lambda sprite: sprite.y)
+
+        for dynamic in self.dynamics:
+            dynamic.collide()
+        for sprite in self.statics + self.dynamics + self.entrances:
+            sprite.update()
+
+        if self.player.y < 0:
+            self.initialise(1)
+
+    def draw(self):
+        self.sprites.sort(displayingOrder)
+        for sprite in self.sprites:
+            sprite.draw()
+
+class Camera(object):
+    def __init__(self, control):
+        self.control = control
+        self.render = control.render
+        self.width = control.WIDTH
+        self.height = control.HEIGHT
+        self.x = 0
+        self.y = 0
+        self.followed = None
+
+    def goTo(self, x, y):
+        self.x = x
+        self.y = y
+
+    def follow(self, point):
+        self.followed = point
+
+    def unfollow(self):
+        self.followed = None
+
+    def update(self):
+        if self.followed:
+            self.x = self.followed.x - self.width / 2
+            self.y = self.followed.y - self.height / 2
+
 class Sprite(object):
-    def __init__(self, game, x, y, width, height):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
         self.original = {
             'x': x,
             'y': y,
             'width': width,
             'height': height
         }
+        self.selected = False
         self.game = game
+        self.render = game.render
         self.screen = game.screen
+        self.level = game.current
+        self.camera = self.level.camera
+        self.level.sprites.append(self)
         self.x = x
         self.y = y
+        self.z = z
         self.width = width
         self.height = height
-        self.velocity_x = 9
-        self.velocity_y = 5
-        self.selected = False
+        self.depth = depth
+        self.color = pygame.Color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        if image:
+            i = pygame.image.load(self.game.path + '/assets/images/' + image)
+            self.frame = i
+
+        if folder:
+            self.frameset = []
+            for f in os.listdir(self.game.path + '/assets/' + folder):
+                i = pygame.image.load(self.game.path + '/assets/' + folder + '/' + f)
+                self.frameset.append(i)
+            self.animations = []
+            self.animation = {'name': 'default', 'sequence': [0],'frame': 0,'looped': True}
+            self.animations.append(self.animation)
+            self.frame = self.frameset[self.animation['sequence'][self.animation['frame']]]
 
     def initialise(self):
         self.x = self.original['x']
@@ -369,28 +637,340 @@ class Sprite(object):
         self.width = self.original['width']
         self.height = self.original['height']
 
-    def update(self):
-        if self.x + self.width + self.velocity_x > self.game.width or self.x + self.velocity_x < 0:
-            self.velocity_x *= -1
-        if self.y + self.height + self.velocity_y > self.game.height or self.y + self.velocity_y < 0:
-            self.velocity_y *= -1
-        self.x += self.velocity_x
-        self.y += self.velocity_y
-
-    def preview(self):
-        pass
-
     def save(self):
         self.original['x'] = self.x
         self.original['y'] = self.y
         self.original['width'] = self.width
         self.original['height'] = self.height
 
+    def addAnimations(self, entity):
+        for animationSet in self.level.animations:
+            if animationSet['entity'] == entity:
+                self.animations = animationSet['animations']
+
+    def play(self, name):
+        if name != self.animation['name']:
+            for animation in self.animations:
+                if name == animation['name']:
+                    self.animation = animation
+                    self.animation['frame'] = 0
+
+    def stopAnimation(self):
+        self.animation = {'name': 'default', 'sequence': [0],'frame': 0,'looped': True}
+
     def draw(self):
+
+        pygame.draw.rect(self.screen, (self.color.r, self.color.g, self.color.b), (self.x - self.camera.x, self.z - self.y - self.height - self.camera.y, self.width, self.depth))
+        pygame.draw.rect(self.screen, (self.color.r * 0.8, self.color.g * 0.8, self.color.b * 0.8), (self.x - self.camera.x, self.z - self.y - self.height + self.depth - self.camera.y, self.width, self.height))
+
+        if hasattr(self, 'animation'):
+
+            if self.animation['frame'] < len(self.animation['sequence']) - 6 / self.game.FPS:
+                self.animation['frame'] += 6 / self.game.FPS
+            else:
+                if self.animation['looped']:
+                    self.animation['frame'] = 0
+                elif 'link' in self.animation:
+                    self.play(self.animation['link'])
+                else:
+                    self.stopAnimation()
+
+            sequencesFrameNumber = int(math.floor(self.animation['frame']))
+            sequence = self.animation['sequence']
+
+            self.frame = self.frameset[sequence[sequencesFrameNumber]]
+
+        if hasattr(self, 'frame'):
+            self.screen.blit(self.frame, (self.x - self.camera.x, self.z - self.y - self.height - self.camera.y, self.width, self.height + self.depth))
+
         if self.selected:
-            pygame.draw.rect(self.screen, (50, 100, 150), (self.x, self.y, self.width, self.height))
+            selectionRectangle = pygame.Surface((self.width, self.height + self.depth))
+            selectionRectangle.fill((0, 100, 155))
+            selectionRectangle.set_alpha(50)
+            self.screen.blit(selectionRectangle, (self.x, self.z - self.y - self.height))
+
+class Static(Sprite):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
+        super(Static, self).__init__(game, x, y, z, width, height, depth, folder, image)
+        self.velocity = Velocity()
+
+    def addAnimations(self, entity):
+        animations = self.level.data['animations']
+        for d in animations:
+            if d['entity'] == entity:
+                self.animations = d['animations']
+
+    def update(self):
+        self.x += int(self.velocity.x / self.game.FPS)
+        self.y += int(self.velocity.y / self.game.FPS)
+        self.z += int(self.velocity.z / self.game.FPS)
+
+class Entrance(Sprite):
+    def __init__(self, game, index, connection, direction, x, y, z, width, height, depth):
+        super(Entrance, self).__init__(game, x, y, z, width, height, depth, None)
+        self.index = index
+        self.connection = connection
+        self.direction = direction
+        self.x = x
+        self.y = y
+        self.z = z
+        self.width = width
+        self.height = height
+        self.depth = depth
+
+    def update(self):
+        if self.overlap(self.level.player):
+            self.game.changeState(self.connection)
+
+    def draw(self):
+        pygame.draw.rect(self.screen, (70, 70, 70), (self.x - self.camera.x, self.z - self.y - self.height - self.camera.y, self.width, self.depth))
+        pygame.draw.rect(self.screen, (30, 30, 30), (self.x - self.camera.x, self.z - self.y - self.height + self.depth - self.camera.y, self.width, self.height))
+
+        if self.selected:
+            selectionRectangle = pygame.Surface((self.width, self.height + self.depth))
+            selectionRectangle.fill((0, 100, 155))
+            selectionRectangle.set_alpha(50)
+            self.screen.blit(selectionRectangle, (self.x, self.z - self.y - self.height))
+
+    def overlap(self, entity):
+        if entity.x + entity.width <= self.x:
+            return False
+        if entity.x >= self.x + self.width:
+            return False
+        if entity.y + entity.height <= self.y:
+            return False
+        if entity.y >= self.y + self.height:
+            return False
+        if entity.z + entity.depth <= self.z:
+            return False
+        if entity.z >= self.z + self.depth:
+            return False
+
+        return True
+
+class Dynamic(Sprite):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
+        super(Dynamic, self).__init__(game, x, y, z, width, height, depth, folder, image)
+        self.velocity = Velocity()
+
+    def collide(self):
+        if self.onFloor:
+            self.onFloor = []
+
+        for i in range(2):
+                for entity in self.level.statics + self.level.dynamics:
+                    if entity == self:
+                        continue
+
+                    velocity = Velocity()
+
+                    velocity.x = int((self.velocity.x - entity.velocity.x) / self.game.FPS)
+                    velocity.y = int((self.velocity.y - entity.velocity.y) / self.game.FPS)
+                    velocity.z = int((self.velocity.z - entity.velocity.z) / self.game.FPS)
+
+
+                    if velocity.x == 0 and velocity.y == 0 and velocity.z == 0:
+                        continue
+
+                    if velocity.x > 0 and self.x > entity.x + entity.width:
+                        continue
+                    if velocity.x < 0 and self.x + self.width < entity.x:
+                        continue
+                    if velocity.y > 0 and self.y > entity.y + entity.height:
+                        continue
+                    if velocity.y < 0 and self.y + self.height < entity.y:
+                        continue
+                    if velocity.z > 0 and self.z > entity.z + entity.depth:
+                        continue
+                    if velocity.z < 0 and self.z + self.depth < entity.z:
+                        continue
+
+                    if velocity.x > 0:
+                        if self.x + self.width + velocity.x < entity.x:
+                            continue
+                    elif velocity.x < 0:
+                        if self.x + velocity.x > entity.x + entity.width:
+                            continue
+                    else:
+                        if entity.x >= self.x + self.width or entity.x + entity.width <= self.x:
+                            continue
+
+                    if velocity.y > 0:
+                        if self.y + self.height + velocity.y < entity.y:
+                            continue
+                    elif velocity.y < 0:
+                        if self.y + velocity.y > entity.y + entity.height:
+                            continue
+                    else:
+                        if entity.y >= self.y + self.height or entity.y + entity.height <= self.y:
+                            continue
+
+                    if velocity.z > 0:
+                        if self.z + self.depth + velocity.z < entity.z:
+                            continue
+                    elif velocity.z < 0:
+                        if self.z + velocity.z > entity.z + entity.depth:
+                            continue
+                    else:
+                        if entity.z >= self.z + self.depth or entity.z + entity.depth <= self.z:
+                            continue
+
+                    if velocity.x > 0:
+                        entry_x = abs((entity.x - (self.x + self.width)) / velocity.x)
+                    elif velocity.x < 0:
+                        entry_x = abs((self.x - (entity.x + entity.width)) / velocity.x)
+                    else:
+                        entry_x = float('inf')
+
+                    if velocity.y > 0:
+                        entry_y = abs((entity.y - (self.y + self.height)) / velocity.y)
+                    elif velocity.y < 0:
+                        entry_y = abs((self.y - (entity.y + entity.height)) / velocity.y)
+                    else:
+                        entry_y = float('inf')
+
+                    if velocity.z > 0:
+                        entry_z = abs((entity.z - (self.z + self.depth)) / velocity.z)
+                    elif velocity.z < 0:
+                        entry_z = abs((self.z - (entity.z + entity.depth)) / velocity.z)
+                    else:
+                        entry_z = float('inf')
+
+
+                    if i == 0:
+                        if abs(entry_y) < 1:
+                            if abs(entry_y) < 1:
+                                self.velocity.y *= entry_y
+
+                            if self.onFloor == [] or self.onFloor:
+                                self.onFloor.append(entity)
+                                self.velocity.x += entity.velocity.x
+                                self.velocity.z += entity.velocity.z
+                    else:
+                        if abs(entry_x) < 1:
+                            if velocity.x > 0:
+                                self.velocity.x = (abs(entity.x - (self.x + self.width)) - abs(entity.velocity.x / self.control.FPS)) * self.control.FPS
+                            elif velocity.x < 0:
+                                self.velocity.x = (abs(self.x - (entity.x + entity.width)) + (entity.velocity.x / self.control.FPS)) * self.control.FPS
+                            else:
+                                self.velocity.x *= entry_x
+                        if abs(entry_z) < 1:
+                            if velocity.z > 0:
+                                self.velocity.z = (abs(entity.z - (self.z + self.depth)) + (entity.velocity.z / self.control.FPS)) * self.control.FPS
+                            elif velocity.z < 0:
+                                self.velocity.z = (abs(self.z - (entity.z + entity.depth)) + (entity.velocity.z / self.control.FPS)) * self.control.FPS
+                            else:
+                                self.velocity.z *= entry_z
+
+        return True
+
+    def update(self):
+        self.x += int(self.velocity.x / self.game.FPS)
+        self.y += int(self.velocity.y / self.game.FPS)
+        self.z += int(self.velocity.z / self.game.FPS)
+
+class Player(Dynamic):
+    def __init__(self, game, x, y, z):
+        super(Player, self).__init__(game, x, y, z, 50, 100, 50, 'player')
+        self.onFloor = []
+        self.focusSpot = Point2D(self.x + self.width / 2, self.z + self.depth / 2 - self.y - self.height / 2)
+        self.addAnimations('player')
+
+    def getKeys(self):
+        k = pygame.key.get_pressed()
+
+        if k[pygame.K_d]:
+            self.velocity.x = 250
+            self.play('walk')
+        elif k[pygame.K_a]:
+            self.play('walk')
+            self.velocity.x = -250
         else:
-            pygame.draw.rect(self.screen, (0, 0, 0), (self.x, self.y, self.width, self.height))
+            self.stopAnimation()
+            self.velocity.x = 0
+
+        if k[pygame.K_s]:
+            self.velocity.z = 250
+        elif k[pygame.K_w]:
+            self.velocity.z = -250
+        else:
+            self.velocity.z = 0
+
+        if k[pygame.K_SPACE] and self.onFloor != []:
+            self.velocity.y = 600
+
+    def updateFocusSpot(self):
+        x = self.x + self.width / 2 + self.velocity.x * 0.7
+        y = self.z - self.y + self.depth / 2 + self.velocity.z * 0.7 - self.y - self.height / 2 + 100
+        self.focusSpot.x += math.floor((x - self.focusSpot.x) / (self.game.FPS * 0.5))
+        self.focusSpot.y += math.floor((y - self.focusSpot.y) / (self.game.FPS * 0.5))
+
+class Game(object):
+    def __init__(self, control, WIDTH, HEIGHT):
+        pygame.init()
+        self.control = control
+        self.path = control.path
+        self.WIDTH = WIDTH
+        self.HEIGHT = HEIGHT
+        self.FPS = 30
+        self.clock = pygame.time.Clock()
+        self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
+        pygame.display.init()
+        self.render = Renderer(self)
+        # self.sprites = [
+        #     Sprite(self, 0, 0, 100, 100),
+        #     Sprite(self, 300, 100, 100, 100),
+        #     Sprite(self, 200, 0, 100, 100),
+        #     Sprite(self, 100, 300, 100, 100)
+        # ]
+        self.mode = 'preview'
+
+        self.camera = Camera(self)
+
+        self.gravity = 2400
+        self.current = Level(self, 1)
+        self.current.initialise(1)
+        self.mouse = Mouse(self)
+
+    def changeMode(self, mode):
+        if mode == 'preview':
+            self.mouse.initialise()
+            self.mode = mode
+            self.current.reset()
+            for sprite in self.sprites:
+                sprite.initialise()
+        elif mode == 'play':
+            self.mode = mode
+            self.current.save()
+
+    def changeState(self, connection):
+        index, entrance = connection
+        self.current = Level(self, index)
+        self.current.initialise(entrance)
+
+    def getKeys(self):
+        self.keys = pygame.key.get_pressed()
+
+    def preview(self):
+        self.mouse.update()
+        self.current.preview()
+        self.screen.fill((255, 255, 255))
+        self.current.draw()
+        self.mouse.draw()
+        pygame.display.update()
+        self.clock.tick(60)
+
+    def update(self):
+        self.screen.fill((255, 255, 255))
+        self.getKeys()
+        self.render.update()
+        self.current.update()
+        self.current.draw()
+        self.render.all()
+        self.clock.tick(30)
+
+    # def addBlock(self, x, y, width, height):
+    #     self.sprites.append(Sprite(self, x, y, width, height))
 
 def main():
     control = Control(1000, 600)

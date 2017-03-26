@@ -1,0 +1,14 @@
+{
+  "index": 0,
+  "statics": [
+    {"x": 150, "y": 50, "z": 400, "width": 50, "height": 50, "depth": 20},
+    {"x": 100, "y": 50, "z": 450, "width": 50, "height": 100, "depth": 30},
+    {"x": 150, "y": 50, "z": 250, "width": 100, "height": 50, "depth": 60},
+    {"x": 350, "y": 0, "z": 300, "width": 400, "height": 50, "depth": 60},
+    {"x": 50, "y": 0, "z": 200, "width": 300, "height": 50, "depth": 300, "image": "s2.png"}
+  ],
+  "dynamics": [],
+  "entrances": [
+    {"index": 1, "connection": [2, 1], "direction": 1, "x": 250, "y": 50, "z": 400}
+  ]
+}

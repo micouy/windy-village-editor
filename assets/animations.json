@@ -1,0 +1,6 @@
+[
+  {"entity": "player", "animations": [
+    {"name": "default", "sequence": [0], "looped": true},
+    {"name": "walk", "sequence": [1, 2, 3], "looped": true}
+  ]}
+]

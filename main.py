@@ -15,10 +15,10 @@ class FramesManager(object):
         self.control = control
         self.root = tk.Tk()
 
-        self.root.minsize(width=1150, height=700)
+        self.root.minsize(width = 1150, height = 700)
         self.frame = Frame(self.root)
-        self.frame.grid_columnconfigure(0, weight=1)
-        self.frame.grid_columnconfigure(1, weight=1)
+        self.frame.grid_columnconfigure(0, weight = 1)
+        self.frame.grid_columnconfigure(1, weight = 1)
         self.frame.pack()
         self.rightDoc = RightDoc(self)
         self.gameFrame = GameFrame(self, width, height)
@@ -33,7 +33,7 @@ class WidgetManager(object):
         self.control = parent.control
         self.root = parent.root
         self.frame = Frame(self.parent.frame)
-        self.frame.grid(row=row, column=column)
+        self.frame.grid(row = row, column = column)
 
 
 class RightDoc(WidgetManager):
@@ -42,7 +42,7 @@ class RightDoc(WidgetManager):
         self.control = parent.control
         self.root = parent.root
         self.frame = Frame(self.parent.frame)
-        self.frame.grid(row=0, column=1, ipadx=10, ipady=10, sticky=N)
+        self.frame.grid(row = 0, column = 1, ipadx = 10, ipady = 10, sticky = N)
         self.controlMenu = ControlMenu(self)
         self.addBlockDoc = AddBlockMenu(self)
 
@@ -52,8 +52,8 @@ class GameFrame(WidgetManager):
         self.control = parent.control
         self.root = parent.root
         self.parent = parent
-        self.frame = Frame(self.parent.frame, width=width, height=height)
-        self.frame.grid(column=0, row=0)
+        self.frame = Frame(self.parent.frame, width = width, height = height)
+        self.frame.grid(column = 0, row = 0)
         os.environ['SDL_WINDOWID'] = str(self.frame.winfo_id())
         os.environ['SDL_VIDEODRIVER'] = 'windib'
 
@@ -61,39 +61,46 @@ class GameFrame(WidgetManager):
 class ControlMenu(WidgetManager):
     def __init__(self, parent):
         super(ControlMenu, self).__init__(parent, 0, 0)
-        self.frame.grid_columnconfigure(0, weight=1)
-        self.frame.grid_columnconfigure(1, weight=1)
-        self.previewMode_button = Button(
-            self.frame, text='Preview', command=lambda: self.control.changeMode('preview'))
-        self.previewMode_button.grid(row=0, column=0, sticky=W + E)
-        self.playMode_button = Button(
-            self.frame, text='Play', command=lambda: self.control.changeMode('play'))
-        self.playMode_button.grid(row=0, column=1, sticky=W + E)
+        self.mode = 'play'
+        self.frame.grid_columnconfigure(0, weight = 1)
+        self.frame.grid_columnconfigure(1, weight = 1)
+        self.mode_button = Button( self.frame, text = 'Play', command = lambda: self.changeMode())
+        self.mode_button.grid(row = 0, column = 0, sticky = W + E)
 
+    def changeMode(self):
+        if self.mode == 'preview':
+            mode = 'preview'
+            self.mode = 'play'
+            self.mode_button['text'] = 'Play'
+        elif self.mode == 'play':
+            mode = 'play'
+            self.mode = 'preview'
+            self.mode_button['text'] = 'Preview'
+        self.control.changeMode(mode)
 
 class AddBlockMenu(WidgetManager):
     def __init__(self, parent):
         super(AddBlockMenu, self).__init__(parent, 1, 0)
         self.x_entry = LabelEntry(self.frame, 'x: ', 0, 0)
         self.y_entry = LabelEntry(self.frame, 'y: ', 1, 0)
+        self.z_entry = LabelEntry(self.frame, 'z: ', 2, 0)
         self.width_entry = LabelEntry(self.frame, 'width: ', 3, 0)
-        self.height_entry = LabelEntry(self.frame, 'height: ', 4 * 3, 0)
+        self.height_entry = LabelEntry(self.frame, 'height: ', 4, 0)
+        self.depth_entry = LabelEntry(self.frame, 'depth: ', 5, 0)
 
-        # self.z_entry = LabelEntry(self.frame, 'z: ', 2, 0)
-        # self.depth_entry = LabelEntry(self.frame, 'depth: ', 5, 0)
+        self.addBlock_button = Button(self.frame, text = 'Add block', command = lambda: self.addBlock())
+        self.addBlock_button.grid(row = 6, columnspan = 2, pady = 2)
 
-        self.addBlock_button = Button(
-            self.frame, text='Add block', command=lambda: self.addBlock())
-        self.addBlock_button.grid(row=5, columnspan=2, pady=2)
-
-        self.response_label = Label(self.frame, text='')
-        self.response_label.grid(row=6, columnspan=2, sticky=W, pady=2)
+        self.response_label = Label(self.frame, text = '')
+        self.response_label.grid(row = 7, columnspan = 2, sticky = W, pady = 2)
 
     def addBlock(self):
         x = self.x_entry.get()
         y = self.y_entry.get()
+        z = self.z_entry.get()
         width = self.width_entry.get()
         height = self.height_entry.get()
+        depth = self.depth_entry.get()
 
         if x.isdigit() and y.isdigit() and width.isdigit() and int(width) > 0 and height.isdigit() and int(height) > 0:
             self.control.addBlock(int(x), int(y), int(width), int(height))
@@ -101,17 +108,17 @@ class AddBlockMenu(WidgetManager):
             self.y_entry.delete()
             self.width_entry.delete()
             self.height_entry.delete()
-            self.response_label.config(text='Block added')
+            self.response_label.config(text = 'Block added')
         else:
-            self.response_label.config(text='Enter correct values')
+            self.response_label.config(text = 'Enter correct values')
 
 
 class LabelEntry(object):
-    def __init__(self, parent, text, row, column, width=10):
-        self.label = Label(parent, text=text)
-        self.label.grid(row=row, column=column, sticky=W, pady=2)
-        self.entry = Entry(parent, width=width)
-        self.entry.grid(row=row, column=column + 1, pady=2)
+    def __init__(self, parent, text, row, column, width = 10):
+        self.label = Label(parent, text = text)
+        self.label.grid(row = row, column = column, sticky = W, pady = 2)
+        self.entry = Entry(parent, width = width)
+        self.entry.grid(row = row, column = column + 1, pady = 2)
 
     def get(self):
         return self.entry.get()
@@ -125,7 +132,7 @@ class LabelEntry(object):
 class Control(object):
     def __init__(self, width, height):
         self.mode = 'preview'
-        self.path = os.path.dirname(os.path.realpath('__file__'))
+        self.path = os.path.dirname(os.path.realpath(__file__))
         self.frames = FramesManager(self, width, height)
 
         self.game = Game(self, width, height)
@@ -331,13 +338,13 @@ class Rectangle(object):
 
 
 class Vector2d(object):
-    def __init__(self, x=0, y=0):
+    def __init__(self, x = 0, y = 0):
         self.x = x
         self.y = y
 
 
 class Vector(object):
-    def __init__(self, x=0, y=0, z=0):
+    def __init__(self, x = 0, y = 0, z = 0):
         self.x = x
         self.y = y
         self.z = z
@@ -349,13 +356,13 @@ class Vector(object):
 
     def mult(self, a):
         if a.isidgit():
-            self.x *= a
-            self.y *= a
-            self.z *= a
+            self.x *=  a
+            self.y *=  a
+            self.z *=  a
         else:
-            self.x *= a.x
-            self.y *= a.y
-            self.z *= a.z
+            self.x *=  a.x
+            self.y *=  a.y
+            self.z *=  a.z
 
 
 class Velocity(Vector):
@@ -375,7 +382,7 @@ class Renderer(object):
         self.toWrite = []
         self.toDraw = []
 
-    def text(self, text, x=None, y=None):
+    def text(self, text, x = None, y = None):
         self.toWrite.append({'text': text, 'x': x, 'y': y})
 
     def point(self, x, y):
@@ -498,6 +505,52 @@ class Level(object):
         self.entrances = []
 
     def initialise(self, entranceIndex):
+        levels_path = self.game.path + '/levels'
+        level_path = levels_path + '/level_' + str(3) + '.json'
+        level_json = open(level_path, 'r')
+        self.data = json.load(level_json)
+        level_json.close()
+
+        animations_path = self.game.path + '/assets/animations.json'
+        animations_json = open(animations_path, 'r')
+        self.animations = json.load(animations_json)
+        animations_json.close()
+
+        self.render.camera = self.camera
+        self.sprites = []
+        self.statics = []
+        self.dynamics = []
+        self.entrances = []
+
+        for sprite in self.data['sprites']:
+            globals()[sprite['class']](self.game, *sprite['arguments'])
+
+        player = {}
+
+        for entrance in self.entrances:
+            if entrance.index == entranceIndex:
+                player['y'] = entrance.y
+
+                if entrance.direction == 1:
+                    player['x'] = entrance.x
+                    player['z'] = entrance.z - 60
+                elif entrance.direction == 2:
+                    player['x'] = entrance.x + entrance.width + 10
+                    player['z'] = entrance.z
+                elif entrance.direction == 3:
+                    player['x'] = entrance.x
+                    player['z'] = entrance.z + entrance.depth + 10
+                elif entrance.direction == 4:
+                    player['x'] = entrance.x - 60
+                    player['z'] = entrance.z
+
+                self.player = Player(self.game, player['x'], player['y'], player['z'])
+                self.dynamics.append(self.player)
+                self.camera.follow(self.player.focusSpot)
+
+                break
+
+    def initialise_(self, entranceIndex):
         levels_path = self.game.path + '/levels'
         level_path = levels_path + '/level_' + str(self.index) + '.json'
         level_json = open(level_path, 'r')
@@ -624,7 +677,7 @@ class Level(object):
         for dynamic in self.dynamics:
             dynamic.velocity.y -= self.game.gravity / self.game.FPS
 
-        self.sprites.sort(key=lambda entity: entity.y)
+        self.sprites.sort(key = lambda entity: entity.y)
 
         for dynamic in self.dynamics:
             dynamic.collide()
@@ -669,14 +722,12 @@ class Camera(object):
 
     def update(self):
         if self.followed:
-            # self.x += math.floor((self.followed.x - self.x - self.width / 2) / (self.game.FPS * 0.1))
-            # self.y += math.floor((self.followed.y - self.y - self.height / 2) / (self.game.FPS  * 0.1))
             self.x = self.followed.x - self.width / 2
             self.y = self.followed.y - self.height / 2
 
 
 class Sprite(object):
-    def __init__(self, game, x, y, z, width, height, depth, folder=None, image=None):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
         self.original = {
             'x': x,
             'y': y,
@@ -772,7 +823,7 @@ class Sprite(object):
 
 
 class Static(Sprite):
-    def __init__(self, game, x, y, z, width, height, depth, folder=None, image=None):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
         super(Static, self).__init__(game, x, y, z, width, height, depth, folder, image)
         self.velocity = Velocity()
 
@@ -789,7 +840,15 @@ class Static(Sprite):
 
 
 class Entrance(Sprite):
-    def __init__(self, game, index, connection, direction, x, y, z, width, height, depth):
+    def __init__(self, game, index, connection, direction, x, y, z, width = None, height = None, depth = None):
+        if not width:
+            if direction == 1 or direction == 3:
+                width = 50
+                depth = 20
+            else:
+                width = 20
+                depth = 50
+            height = 150
         super(Entrance, self).__init__(game, x, y, z, width, height, depth, None)
         self.index = index
         self.connection = connection
@@ -802,12 +861,20 @@ class Entrance(Sprite):
         self.depth = depth
 
     def update(self):
-        if self.overlap(self.level.player):
-            self.game.changeState(self.connection)
+        # if self.overlap(self.level.player):
+        #     self.game.changeState(self.connection)
+        pass
 
     def draw(self):
-        pygame.draw.rect(self.screen, (70, 70, 70), (self.x - self.camera.x, self.z - self.y - self.height - self.camera.y, self.width, self.depth))
-        pygame.draw.rect(self.screen, (30, 30, 30), (self.x - self.camera.x, self.z - self.y - self.height + self.depth - self.camera.y, self.width, self.height))
+        plane = pygame.Surface((self.width, self.height + self.depth))
+        plane.fill((255, 255, 255))
+        plane.set_alpha(150)
+        pygame.draw.rect(plane, (230, 230, 230), (0, 0, self.width, self.depth))
+        pygame.draw.rect(plane, (200, 200, 200), (0, self.depth, self.width, self.height))
+        pygame.draw.rect(plane, (230, 230, 230), (0, self.height, self.width, self.depth))
+        pygame.draw.line(plane, (230, 20, 20), (0, self.depth), (self.width, self.height + self.depth), 3)
+        pygame.draw.line(plane, (230, 20, 20), (self.width, self.depth), (0, self.height + self.depth), 3)
+        self.screen.blit(plane, (self.x - self.camera.x, self.z + self.depth - self.y - self.height - self.camera.y))
 
     def overlap(self, entity):
         if entity.x + entity.width <= self.x:
@@ -827,7 +894,7 @@ class Entrance(Sprite):
 
 
 class Dynamic(Sprite):
-    def __init__(self, game, x, y, z, width, height, depth, folder=None, image=None):
+    def __init__(self, game, x, y, z, width, height, depth, folder = None, image = None):
         super(Dynamic, self).__init__(game, x, y, z, width, height, depth, folder, image)
         self.velocity = Velocity()
 
@@ -916,7 +983,7 @@ class Dynamic(Sprite):
                 if i == 0:
                     if abs(entry_y) < 1:
                         if abs(entry_y) < 1:
-                            self.velocity.y *= entry_y
+                            self.velocity.y *=  entry_y
 
                         if self.onFloor == [] or self.onFloor:
                             self.onFloor.append(entity)
@@ -929,14 +996,14 @@ class Dynamic(Sprite):
                         elif velocity.x < 0:
                             self.velocity.x = (abs(self.x - (entity.x + entity.width)) + (entity.velocity.x / self.game.FPS)) * self.game.FPS
                         else:
-                            self.velocity.x *= entry_x
+                            self.velocity.x *=  entry_x
                     if abs(entry_z) < 1:
                         if velocity.z > 0:
                             self.velocity.z = (abs(entity.z - (self.z + self.depth)) + (entity.velocity.z / self.game.FPS)) * self.game.FPS
                         elif velocity.z < 0:
                             self.velocity.z = (abs(self.z - (entity.z + entity.depth)) + (entity.velocity.z / self.game.FPS)) * self.game.FPS
                         else:
-                            self.velocity.z *= entry_z
+                            self.velocity.z *=  entry_z
 
         return True
 

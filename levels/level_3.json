@@ -1,17 +1,15 @@
 {
   "index": 0,
   "sprites": [
-    {"class": "Static", "arguments": {"x": 100, "y": 0, "z": 200, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 200, "y": 0, "z": 200, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 300, "y": 0, "z": 200, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 300, "y": 0, "z": 300, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 300, "y": 0, "z": 400, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 100, "y": 0, "z": 300, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 200, "y": 0, "z": 300, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 100, "y": 0, "z": 400, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Static", "arguments": {"x": 200, "y": 0, "z": 400, "width": 100, "height": 50, "depth": 100}},
-    {"class": "Entrance", "arguments": {"index": 1, "connection": [1, 1], "direction": 3, "x": 200, "y": 50, "z": 300}}
-  ],
-  "entrances": [
+    {"class": "Static", "arguments": [100, 0, 200, 100, 50, 100]},
+    {"class": "Static", "arguments": [200, 0, 200, 100, 50, 100]},
+    {"class": "Static", "arguments": [300, 0, 200, 100, 50, 100]},
+    {"class": "Static", "arguments": [300, 0, 300, 100, 50, 100]},
+    {"class": "Static", "arguments": [300, 0, 400, 100, 50, 100]},
+    {"class": "Static", "arguments": [100, 0, 300, 100, 50, 100]},
+    {"class": "Static", "arguments": [200, 0, 300, 100, 50, 100]},
+    {"class": "Static", "arguments": [100, 0, 400, 100, 50, 100]},
+    {"class": "Static", "arguments": [200, 0, 400, 100, 50, 100]},
+    {"class": "Entrance", "arguments": [1, [1, 1], 3, 200, 50, 300]}
   ]
 }

@@ -49,7 +49,7 @@ class RightDoc(WidgetManager):
 
 class GameFrame(WidgetManager):
     def __init__(self, parent, width, height):
-        super(GameFrame, self).__init__(parent, 0, 0)
+        super(GameFrame, self).__init__(parent)
         self.frame = Frame(self.parent.frame, width = width, height = height)
         self.frame.grid(column = 0, row = 0)
         os.environ['SDL_WINDOWID'] = str(self.frame.winfo_id())
@@ -430,46 +430,26 @@ class Debug(object):
                 else:
                     pygame.draw.ellipse(self.screen, (0, 0, 0), (shape['x'], shape['y'], 4, 4))
 
-# todo:
-# scene manager:
-#     . stores assets (one image?)
-#     . dispose of animations (doesnt store them, just assigns them to the sprites during initialisation)
-#     . draws sprites
-#     . is managed by game, not by level
-
-class DrawingManager(object):
-    def __init__(self, game):
-        self.path = game.path + '/assets/'
-        self.animations = []
-        self.images = []
-        self.sprites = []
-
-    def draw(self):
-        for sprite in self.sprites:
-            spriteInfo = sprite.getInfo()
-
-
 
 class Game(object):
     def __init__(self, control, width, height):
         pygame.init()
         pygame.display.init()
-
+        self.control = control
         self.path = control.path
         self.width = width
         self.height = height
         self.fps = 60
-        self.control = control
-        self.mode = 'preview'
-        self.gravity = 2400
-
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((self.width, self.height))
-        self.scene = DrawingManager(self)
         self.debug = Debug(self)
         self.camera = Camera(self)
         self.mouse = Mouse(self)
-
+        self.mode = 'preview'
+        self.gravity = 2400
+        self.levels = []
+        self.progress = 0
+        self.story = 0
         self.current = Level(self, 1)
         self.current.initialise(1)
         self.mouse.initialise()
@@ -794,6 +774,36 @@ class Sprite(object):
         self.width, self.height, self.depth = width, height, depth
         self.overlapping = False
         self.color = pygame.Color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        if image:
+            i = pygame.image.load(self.game.path + '/assets/images/' + image)
+            self.frame = i
+
+        if folder:
+            self.frameset = []
+            for f in os.listdir(self.game.path + '/assets/' + folder):
+                i = pygame.image.load(self.game.path + '/assets/' + folder + '/' + f)
+                self.frameset.append(i)
+            self.animations = []
+            self.animation = {'name': 'default', 'sequence': [0], 'frame': 0, 'looped': True}
+            self.animations.append(self.animation)
+            self.frame = self.frameset[self.animation['sequence'][self.animation['frame']]]
+
+    def addChild(self, child):
+        self.children.append(child)
+        child.parent = self
+
+    def addAnimations(self, sprite):
+        for animationSet in self.level.animations:
+            if animationSet['sprite'] == sprite:
+                self.animations = animationSet['animations']
+
+    def play(self, animationName):
+        for animation in self.animations:
+            if animation['name'] == animationName:
+                self.animation = animation
+
+    def getSelfDisplayingIndex(self):
+        return self.level.sprites.index(self)
 
     def preview(self):
         self.overlapping = False
@@ -805,6 +815,13 @@ class Sprite(object):
                 and sprite.z + sprite.depth <= self.z
                 and sprite.z >= self.z + self.depth):
                 self.overlapping = True
+            # if not (sprite.x + sprite.width > self.x
+            #     or sprite.x < self.x + self.width
+            #     or sprite.y + sprite.height > self.y
+            #     or sprite.y < self.y + self.height
+            #     or sprite.z + sprite.depth > self.z
+            #     or sprite.z < self.z + self.depth):
+            #     self.overlapping = True
 
         if not self.mouse.dragging:
             self.distance = Vector2d((self.mouse.x - self.x), (self.mouse.y - (self.z - self.y)))
@@ -830,12 +847,12 @@ class Sprite(object):
         #     self.y = self.virtual.y + self.parent.y
         #     self.z = self.virtual.z + self.parent.z
 
-    # def update(self, name):
-    #     if name != self.animation['name']:
-    #         for animation in self.animations:
-    #             if name == animation['name']:
-    #                 self.animation = animation
-    #                 self.animation['frame'] = 0
+    def update(self, name):
+        if name != self.animation['name']:
+            for animation in self.animations:
+                if name == animation['name']:
+                    self.animation = animation
+                    self.animation['frame'] = 0
 
     def stopAnimation(self):
         self.animation = {'name': 'default', 'sequence': [0], 'frame': 0, 'looped': True}
@@ -853,14 +870,6 @@ class Sprite(object):
         self.original['width'] = self.width
         self.original['height'] = self.height
         self.original['height'] = self.depth
-
-    def getInfo(self):
-        info = {
-            'x': self.x, 'y': self.y, 'z': self.z,
-            'width': self.x, 'height': self.height, 'depth': self.depth,
-            'animationInfo': self.animation.getInfo()
-        }
-        return info
 
     def draw(self):
         pygame.draw.rect(self.screen, (self.color.r, self.color.g, self.color.b), (self.x - self.camera.x, self.z - self.y - self.height - self.camera.y, self.width, self.depth))

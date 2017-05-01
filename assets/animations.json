@@ -1,9 +1,18 @@
 [
   {
-    "class": "Player",
+    "name": "Player",
     "animations": [
-      {"name": "default", "sequence": [0], "looped": true, "playOnInit": true},
+      {"name": "default", "sequence": [0], "looped": true},
       {"name": "walk", "sequence": [1, 2, 3], "looped": true}
+    ],
+    "moves": [
+      {"name": "walk_move", "sequence": [
+        {"time": 5, "x": 25},
+        {"time": 20, "x": 100},
+        {"time": 5, "x": 125},
+        {"time": 25, "x": 0},
+        {"time": 25, "x": 0}
+        ], "looped": true, "playOnInit": true}
     ]
   }
 ]

@@ -7,10 +7,8 @@
     ],
     "moves": [
       {"name": "walk_move", "sequence": [
-        {"time": 5, "x": 25},
-        {"time": 20, "x": 100},
-        {"time": 5, "x": 125},
-        {"time": 25, "x": 0},
+        {"time": 30, "x": 120},
+        {"time": 60, "x": 0},
         {"time": 25, "x": 0}
         ], "looped": true, "playOnInit": true}
     ]
